@@ -22,9 +22,19 @@ alpha = 1.0
 beta = 0.0
 
 ### Integration ###
-gaussOrder = 2
-GaussPoints = [-1.0 / sqrt(3), 1.0 / sqrt(3)]
-GaussWeights = [1.0, 1.0]
+# gaussOrder = 2
+# GaussPoints = [-1.0/sqrt(3), 1.0/sqrt(3)]
+# GaussWeights = [1.0, 1.0]
+gaussOrder = 3
+GaussPoints = [-sqrt(3.0/5.0), 0.0, sqrt(3.0/5.0)]
+GaussWeights = [5.0/9.0, 8.0/9.0, 5.0/9.0]
+# gaussOrder = 4
+# tmp1 = sqrt(3.0/7.0 - 2.0/7.0*sqrt(6.0/5.0))
+# tmp2 = sqrt(3.0/7.0 + 2.0/7.0*sqrt(6.0/5.0))
+# tmp3 = (18.0 + sqrt(30.0)) / 36.0
+# tmp4 = (18.0 - sqrt(30.0)) / 36.0
+# GaussPoints = [-tmp2, -tmp1, tmp1, tmp2]
+# GaussWeights = [tmp4, tmp3, tmp3, tmp4]
 
 ### Mesh ###
 nElem = 5
@@ -108,7 +118,7 @@ F[-1] = F[-1] + sigma * beta
 DNodes = [0]
 U = np.zeros((nDof, 1))
 U[0] = alpha
-K = L + lda * M
+K = sigma * L + lda * M
 mask_D = np.array([(i in DNodes) for i in range(len(U))])
 U_D = U[mask_D]
 # print U_D
