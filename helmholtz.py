@@ -22,11 +22,35 @@ def gaussIntegration(order):
         tmp4 = (18.0 - sqrt(30.0)) / 36.0
         GaussPoints = [-tmp2, -tmp1, tmp1, tmp2]
         GaussWeights = [tmp4, tmp3, tmp3, tmp4]
+    elif order == 5:
+        tmp1 = sqrt(5.0 - 2.0*sqrt(10.0/7.0)) / 3.0
+        tmp2 = sqrt(5.0 + 2.0*sqrt(10.0/7.0)) / 3.0
+        tmp3 = (322.0 + 13.0*sqrt(70.0)) / 900.0
+        tmp4 = (322.0 - 13.0*sqrt(70.0)) / 900.0
+        GaussPoints = [-tmp2, -tmp1, 0.0, tmp1, tmp2]
+        GaussWeights = [tmp4, tmp3, 128.0/225.0, tmp3, tmp4]
     else:
         raise Exception('Order of Gauss integration not implemented')
     return {'gp': GaussPoints, 'gw': GaussWeights}
 
-def helmholtz(numberOfElements):
+def shapeFunction(order, xi):
+    if order == 1:
+        return np.array([[(1.0 - xi) / 2.0], [(1.0 + xi) / 2.0]])
+    elif order == 2:
+        # return np.array([[(1.0 - xi)/2.0], [(1.0 - xi)*(1.0 + xi)/4.0], [(1.0 + xi)/2.0]])
+        return np.array([[xi*(xi - 1.0)/2.0], [(1.0 - xi)*(1.0 + xi)], [xi*(xi + 1.0)/2.0]])
+    else:
+        raise Exception('Order of shape function not implemented')
+
+def derShapeFunction(order, xi):
+    if order == 1:
+        return np.array([[-1.0 / 2.0], [1.0 / 2.0]])
+    elif order == 2:
+        return np.array([[(2.0*xi - 1.0)/2.0], [-2*xi], [(2.0*xi + 1.0)/2.0]])
+    else:
+        raise Exception('Order of shape function not implemented')
+
+def helmholtz(numberOfElements, order):
     ### Constants ###
     lda = 1.0
     sigma = 1.0
@@ -42,19 +66,17 @@ def helmholtz(numberOfElements):
     beta = 0.0
 
     ### Integration ###
-    gaussOrder = 3
+    gaussOrder = 2*order + 1
     Gauss = gaussIntegration(gaussOrder)
     GaussPoints = Gauss['gp']
     GaussWeights = Gauss['gw']
 
     ### Mesh ###
     nElem = numberOfElements
-    nNodePerElem = 2
-    nNodeDof = [1, 1]
-    nDofInElem = sum(nNodeDof)
-    nNode = nElem + 1
+    nNodePerElem = order + 1
+    nNode = order * nElem + 1
     nDof = nNode
-    deltaX = length / nElem
+    deltaX = length / (nNode - 1)
 
     ### Coordinate matrix ###
     Coor = np.zeros((nNode, nDim))
@@ -65,25 +87,31 @@ def helmholtz(numberOfElements):
     ### Connectivity matrix ###
     Conn = np.zeros((nElem, nNodePerElem + 1), dtype=np.int)
     for i in range(nElem):
-        Conn[i, 0] = i
-        Conn[i, 1] = i
-        Conn[i, 2] = i + 1
+        if order == 1:
+            Conn[i, 0] = i
+            Conn[i, 1] = i
+            Conn[i, 2] = Conn[i, 1] + 1
+        elif order == 2:
+            Conn[i, 0] = i
+            Conn[i, 1] = 2 * i
+            Conn[i, 2] = Conn[i, 1] + 1
+            Conn[i, 3] = Conn[i, 2] + 1
+        else:
+            raise Exception('Order for connectivity not implemented')
     # print Conn
-
-    ### Global DOF ###
-    # GlobDof = np.zeros((nNode, 2), dtype=np.int)
 
     ### Assembly of M ###
     M = np.zeros((nDof, nDof))
     for e in range(nElem):
         nodesElem = Conn[e, 1:]
-        # coorElem = Coor[nodesElem, :]
+        coorElem = Coor[nodesElem, :]
         Me = np.zeros((nNodePerElem, nNodePerElem))
         for i in range(gaussOrder):
             xi = GaussPoints[i]
             weight = GaussWeights[i]
-            N = np.array([[(1.0 - xi) / 2.0], [(1.0 + xi) / 2.0]])
-            Je = deltaX / 2.0
+            N = shapeFunction(order, xi)
+            DerN = derShapeFunction(order, xi)
+            Je = np.dot(DerN.T, coorElem)
             Me = Me + N * N.T * Je * weight
         # print Me
         M[np.ix_(nodesElem, nodesElem)] = M[np.ix_(nodesElem, nodesElem)] + Me
@@ -93,15 +121,15 @@ def helmholtz(numberOfElements):
     L = np.zeros((nDof, nDof))
     for e in range(nElem):
         nodesElem = Conn[e, 1:]
-        # coorElem = Coor[nodesElem, :]
+        coorElem = Coor[nodesElem, :]
         Le = np.zeros((nNodePerElem, nNodePerElem))
         for i in range(gaussOrder):
             xi = GaussPoints[i]
             weight = GaussWeights[i]
-            DerN = np.array([[-1.0 / 2.0], [1.0 / 2.0]])
-            Je = deltaX / 2.0
+            DerN = derShapeFunction(order, xi)
+            Je = np.dot(DerN.T, coorElem)
             derXiDerX = 1.0 / Je
-            Le = Le + DerN * DerN.T * derXiDerX * derXiDerX * Je * weight
+            Le = Le + DerN * DerN.T * derXiDerX**2.0 * Je * weight
         # print Le
         L[np.ix_(nodesElem, nodesElem)] = L[np.ix_(nodesElem, nodesElem)] + Le
     # print L
@@ -115,9 +143,10 @@ def helmholtz(numberOfElements):
         for i in range(gaussOrder):
             xi = GaussPoints[i]
             weight = GaussWeights[i]
-            N = np.array([[(1.0 - xi) / 2.0], [(1.0 + xi) / 2.0]])
-            Je = deltaX / 2.0
-            x = N[0] * coorElem[0] + N[1] * coorElem[1]
+            N = shapeFunction(order, xi)
+            DerN = derShapeFunction(order, xi)
+            Je = np.dot(DerN.T, coorElem)
+            x = np.dot(N.T, coorElem)
             Fe = Fe + N * f(x, sigma, lda) * Je * weight
         # print Fe
         F[np.ix_(nodesElem)] = F[np.ix_(nodesElem)] + Fe
@@ -167,7 +196,13 @@ def helmholtz(numberOfElements):
 
 if __name__ == '__main__':
     Nel = [5, 10, 20, 50, 100]
-    error = []
+    firstOrder = 1
+    firstError = []
     for nEl in Nel:
-        error.append(helmholtz(nEl))
-    print error
+        firstError.append(helmholtz(nEl, firstOrder))
+    print firstError
+    secondOrder = 2
+    secondError = []
+    for nEl in Nel:
+        secondError.append(helmholtz(nEl, secondOrder))
+    print secondError
