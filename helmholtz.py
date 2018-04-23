@@ -195,14 +195,23 @@ def helmholtz(numberOfElements, order):
     return err
 
 if __name__ == '__main__':
-    Nel = [5, 10, 20, 50, 100]
+    Nel = np.array([5, 10, 20, 50, 100])
     firstOrder = 1
-    firstError = []
+    firstError = np.array([])
     for nEl in Nel:
-        firstError.append(helmholtz(nEl, firstOrder))
-    print firstError
+        firstError = np.append(firstError, [helmholtz(nEl, firstOrder)])
+    # print firstError
     secondOrder = 2
     secondError = []
     for nEl in Nel:
-        secondError.append(helmholtz(nEl, secondOrder))
-    print secondError
+        secondError = np.append(secondError, [helmholtz(nEl, secondOrder)])
+    # print secondError
+    # size = np.log(Nel)
+    fig, ax = plt.subplots()
+    plt.loglog(Nel, firstError, 'ro-', Nel, secondError, 'bv-')
+    ax.set(xlabel='1/Nel', ylabel='Error',
+           title='LogLog Error')
+    ax.grid()
+    plt.legend(['Linear Elements', 'Quadratic Elements'])
+    fig.savefig('error.png')
+    plt.show()
