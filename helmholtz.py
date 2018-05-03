@@ -1,12 +1,20 @@
+#####################################################################
+###    File:               helmholtz.py                           ###
+###    Author:             Sebastia Ramon                         ###
+###    Version:            1.0.0                                  ###
+###    License:            MIT                                    ###
+#####################################################################
+
 from math import cos, pi, sqrt
 import numpy as np
 import matplotlib.pyplot as plt
-# np.set_printoptions(suppress=True)
-# np.set_printoptions(precision=4)
+from scipy.stats import linregress
 
+### Function in the RHS of Helmholtz equation ###
 def f(x, s, l):
     return -(4 * s * pi**2 + l) * cos(2 * pi * x)
 
+### Subroutine that return necessary information for performing Guassian quadrature ###
 def gaussIntegration(order):
     if order == 2:
         GaussPoints = [-1.0/sqrt(3), 1.0/sqrt(3)]
@@ -33,6 +41,7 @@ def gaussIntegration(order):
         raise Exception('Order of Gauss integration not implemented')
     return {'gp': GaussPoints, 'gw': GaussWeights}
 
+### Subroutine that returns shape functions for 1st and 2nd order ###
 def shapeFunction(order, xi):
     if order == 1:
         return np.array([[(1.0 - xi) / 2.0], [(1.0 + xi) / 2.0]])
@@ -42,6 +51,7 @@ def shapeFunction(order, xi):
     else:
         raise Exception('Order of shape function not implemented')
 
+### Subroutine that returns shape functions' derivatives for 1st and 2nd order ###
 def derShapeFunction(order, xi):
     if order == 1:
         return np.array([[-1.0 / 2.0], [1.0 / 2.0]])
@@ -50,6 +60,7 @@ def derShapeFunction(order, xi):
     else:
         raise Exception('Order of shape function not implemented')
 
+### Subroutine that implements a solver for the Helmholtz equation ###
 def helmholtz(numberOfElements, order):
     ### Constants ###
     lda = 1.0
@@ -206,11 +217,12 @@ if __name__ == '__main__':
     for nEl in Nel:
         secondError = np.append(secondError, [helmholtz(nEl, secondOrder)])
     # print secondError
-    # size = np.log(Nel)
+    NelInv = 1.0/Nel
+    # print linregress(np.log(firstError), np.log(NelInv))[0]
+    # print linregress(np.log(secondError), np.log(NelInv))[0]
     fig, ax = plt.subplots()
-    plt.loglog(Nel, firstError, 'ro-', Nel, secondError, 'bv-')
-    ax.set(xlabel='1/Nel', ylabel='Error',
-           title='LogLog Error')
+    plt.loglog(NelInv, firstError, 'ro-', NelInv, secondError, 'bv-')
+    ax.set(xlabel='1/Nel', ylabel='Error', title='LogLog Error')
     ax.grid()
     plt.legend(['Linear Elements', 'Quadratic Elements'])
     fig.savefig('error.png')
